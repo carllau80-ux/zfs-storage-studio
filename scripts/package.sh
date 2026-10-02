@@ -3,7 +3,7 @@
 # 用法: bash scripts/package.sh [版本号]
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VER=${1:-0.91}
+VER=${1:-0.92}
 OUT=releases/zfs-platform-$VER
 rm -rf "$OUT"; mkdir -p "$OUT/bin" "$OUT/deploy"
 

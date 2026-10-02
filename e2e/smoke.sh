@@ -2,6 +2,11 @@
 # ZFS 存储管理平台 e2e 冒烟(存储节点本机执行,root)
 set -uo pipefail
 M=http://127.0.0.1:8080/api/v1
+# 凭据参数化:优先环境变量,其次部署期生成的 0600 文件;仓库内不含任何口令
+ADMIN_USER=${ADMIN_USER:-admin}
+ADMIN_PASSWORD=${ADMIN_PASSWORD:-$(cat /etc/zfs-platform/admin.secret 2>/dev/null)}
+if [ -z "$ADMIN_PASSWORD" ]; then echo "缺少管理员口令:设置 ADMIN_PASSWORD 或提供 /etc/zfs-platform/admin.secret" >&2; exit 2; fi
+OP_PASS=$(openssl rand -hex 8); VIEW_PASS=$(openssl rand -hex 8)
 INIT_IQN=$(grep -m1 "^InitiatorName" /etc/iscsi/initiatorname.iscsi | cut -d= -f2)
 PASS=0; FAIL=0
 IMG=/var/lib/zfs-platform/e2e-pool.img
@@ -76,8 +81,8 @@ req2() { # req2 METHOD PATH [json] token
 }
 login() { curl -s -X POST "$M/auth/login" -H 'Content-Type: application/json' -d "{\"username\":\"$1\",\"password\":\"$2\"}" | jq -r '.data.token'; }
 
-ADMIN=$(login admin admin123); TOKEN=$ADMIN
-[ -n "$ADMIN" ] && [ "$ADMIN" != "null" ] && ok "admin 登录" || bad "admin 登录"
+ADMIN=$(login "$ADMIN_USER" "$ADMIN_PASSWORD"); TOKEN=$ADMIN
+[ -n "$ADMIN" ] && [ "$ADMIN" != "null" ] && ok "$ADMIN_USER 登录" || bad "$ADMIN_USER 登录"
 
 for i in $(seq 1 30); do
   get /nodes
@@ -104,7 +109,20 @@ done
 sleep 13   # 越过一次轮询窗口,确保 DB 与实况一致
 
 echo "2) RBAC"
-VTOKEN=$(login viewer viewer123); OTOKEN=$(login operator operator123)
+# 动态创建/重置 operator、viewer(RBAC 验证用;不依赖任何内置口令)
+ensure_user() { # $1=用户名 $2=口令 $3=角色
+  local u=$1 p=$2 r=$3 id
+  curl -s -X POST -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
+    -d "{\"username\":\"$u\",\"password\":\"$p\",\"role\":\"$r\"}" "$M/users" >/dev/null
+  id=$(curl -s -H "Authorization: Bearer $ADMIN" "$M/users" | jq -r ".data.users[]|select(.username==\"$u\")|.id" | head -1)
+  if [ -n "$id" ]; then
+    curl -s -X PATCH -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
+      -d "{\"password\":\"$p\",\"role\":\"$r\"}" "$M/users/$id" >/dev/null
+  fi
+}
+ensure_user e2e-operator "$OP_PASS" operator
+ensure_user e2e-viewer "$VIEW_PASS" viewer
+VTOKEN=$(login e2e-viewer "$VIEW_PASS"); OTOKEN=$(login e2e-operator "$OP_PASS")
 req2 POST /pools '{}' "$VTOKEN";  [ "$REQ_CODE" = "403" ] && ok "viewer 写被拒 403" || bad "viewer 写被拒 (得 $REQ_CODE)"
 req2 POST /users '{"username":"x","password":"123456","role":"admin"}' "$OTOKEN"
 [ "$REQ_CODE" = "403" ] && ok "operator 用户管理被拒 403" || bad "operator 用户管理 (得 $REQ_CODE)"

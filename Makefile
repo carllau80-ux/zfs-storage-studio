@@ -1,6 +1,6 @@
 # ZFS 存储管理平台 —— 构建/同步/部署入口(在 192.168.13.38 上开发与测试)
 REMOTE := 192.168.13.38
-VERSION ?= 0.91
+VERSION ?= 0.92
 COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo nogit)
 BUILD_TIME := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -X zfsmgr/internal/app.Version=$(VERSION) -X zfsmgr/internal/app.Commit=$(COMMIT) -X zfsmgr/internal/app.BuildTime=$(BUILD_TIME)

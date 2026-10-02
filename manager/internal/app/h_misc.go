@@ -77,10 +77,6 @@ func (a *App) handleUserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := userFrom(r)
-	if me.ID == id {
-		writeErr(w, http.StatusConflict, "CONFLICT", "不能修改自己的账号状态")
-		return
-	}
 	var body struct {
 		Password *string `json:"password"`
 		Role     *string `json:"role"`
@@ -88,6 +84,12 @@ func (a *App) handleUserUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeErr(w, http.StatusBadRequest, "VALIDATION", "%v", err)
+		return
+	}
+	// 自我保护:允许修改自己的口令,但禁止修改自己的角色/启用状态
+	if me != nil && me.ID == id && (body.Role != nil || body.Disabled != nil) {
+		writeErrK(w, http.StatusConflict, "CONFLICT", KErrForbidden, nil,
+			"不能修改自己的角色或账号状态")
 		return
 	}
 	if body.Role != nil {

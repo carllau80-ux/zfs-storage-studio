@@ -73,13 +73,15 @@ umask 077
 [ -s "$ETC/pg.dsn" ] || printf '%s\n' "$DB_URL" > "$ETC/pg.dsn"
 [ -s "$ETC/agent.token" ] || cp "$TOKEN_FILE" "$ETC/agent.token"
 [ -s "$ETC/data.key" ] || cp "$DATA_KEY" "$ETC/data.key"
-chmod 600 "$ETC/pg.dsn" "$ETC/agent.token" "$ETC/data.key"
+[ -s "$ETC/admin.secret" ] || openssl rand -base64 15 | tr -d '/+=' | cut -c1-16 > "$ETC/admin.secret"
+chmod 600 "$ETC/pg.dsn" "$ETC/agent.token" "$ETC/data.key" "$ETC/admin.secret"
 if [ ! -f "$ETC/manager.toml" ]; then
   cat > "$ETC/manager.toml" <<EOF
 listen = "127.0.0.1:${MGR_PORT}"
 db_url_file = "$ETC/pg.dsn"
 agent_token_file = "$ETC/agent.token"
 data_key_file = "$ETC/data.key"
+init_admin_password_file = "$ETC/admin.secret"
 poll_seconds = 12
 static_dir = ""
 EOF
@@ -152,7 +154,8 @@ systemctl restart $MGR_UNIT
 [ "$INSTALL_AGENT" = 1 ] && systemctl restart $AGENT_UNIT
 sleep 5
 if curl -sf -o /dev/null "http://127.0.0.1:${MGR_PORT}/"; then
-  log "✔ Manager 已启动: http://<本机IP>:${MGR_PORT}  (默认账号 admin/admin123,登录后请修改)"
+  log "✔ Manager 已启动: http://<本机IP>:${MGR_PORT}"
+  log "  初始管理员口令文件(0600,首次登录后请修改): $ETC/admin.secret"
 else
   log "⚠ Manager 启动异常,请查看: journalctl -u $MGR_UNIT -n 50"
 fi

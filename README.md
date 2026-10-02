@@ -37,7 +37,7 @@ Manager(Go)+ Node Agent(Python)+ PostgreSQL + Vue3 前端 的完整闭环,并经
 ## 访问
 
 - 平台 http://192.168.13.38:8080(或 http://127.0.0.1:8080)
-- 账号(演示):admin/admin123(admin)、operator/operator123、viewer/viewer123
+- 初始管理员:用户名 `admin`,口令由部署时生成并保存在 **/etc/zfs-platform/admin.secret(0600)**;首次登录后请立即修改。operator/viewer 由管理员在「系统 → 用户」按需创建。
 
 ## 架构与代码
 

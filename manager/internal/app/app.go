@@ -189,7 +189,7 @@ func (a *App) Run(cfgPath string) error {
 		return err
 	}
 	readyFlag.Store(false)
-	if err := SeedUsers(ctx, pool); err != nil {
+	if err := SeedAdmin(ctx, pool, "/var/lib/runstor", cfg.InitAdminPassword()); err != nil {
 		return err
 	}
 	if err := MigrateTokens(ctx, pool); err != nil {

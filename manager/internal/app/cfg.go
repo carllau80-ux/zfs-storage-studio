@@ -14,18 +14,20 @@ import (
 // Config 是 Manager 的 TOML 配置(/etc/zfs-platform/manager.toml)。
 // 敏感项只写引用:*_file 指向 0600 文件;也接受 *_env。
 type Config struct {
-	Listen         string `toml:"listen"`      // HTTP 监听(基线:仅回环,由 Caddy/nginx 反代)
-	DBURLFile      string `toml:"db_url_file"` // PG DSN 文件(0600)
-	DBURLEnv       string `toml:"db_url_env"`  // 或环境变量名
-	AgentTokenFile string `toml:"agent_token_file"`
-	DataKeyFile    string `toml:"data_key_file"`
-	PollSeconds    int    `toml:"poll_seconds"`
-	StaticDir      string `toml:"static_dir"`
+	Listen                string `toml:"listen"`      // HTTP 监听(基线:仅回环,由 Caddy/nginx 反代)
+	DBURLFile             string `toml:"db_url_file"` // PG DSN 文件(0600)
+	DBURLEnv              string `toml:"db_url_env"`  // 或环境变量名
+	AgentTokenFile        string `toml:"agent_token_file"`
+	DataKeyFile           string `toml:"data_key_file"`
+	InitAdminPasswordFile string `toml:"init_admin_password_file"` // 首次初始化 admin 的口令文件(可选,0600)
+	PollSeconds           int    `toml:"poll_seconds"`
+	StaticDir             string `toml:"static_dir"`
 
 	// 解析后(不落盘、不打印)
-	dbURL      string
-	agentToken string
-	dataKeyHex string
+	dbURL       string
+	agentToken  string
+	dataKeyHex  string
+	initAdminPW string
 }
 
 const (
@@ -112,6 +114,11 @@ func LoadConfig(path string) (*Config, error) {
 	if len(c.dataKeyHex) != 64 {
 		return nil, fmt.Errorf("data_key 须为 64 位 hex(32 字节)")
 	}
+	if c.InitAdminPasswordFile != "" {
+		if c.initAdminPW, err = readSecretFile(c.InitAdminPasswordFile, "init_admin_password"); err != nil {
+			return nil, err
+		}
+	}
 	return &c, nil
 }
 
@@ -185,5 +192,6 @@ func (c *Config) DataKey() ([]byte, error) {
 	return hex.DecodeString(c.dataKeyHex)
 }
 
-func (c *Config) DBURL() string      { return c.dbURL }
-func (c *Config) AgentToken() string { return c.agentToken }
+func (c *Config) DBURL() string             { return c.dbURL }
+func (c *Config) AgentToken() string        { return c.agentToken }
+func (c *Config) InitAdminPassword() string { return c.initAdminPW }

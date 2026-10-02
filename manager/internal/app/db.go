@@ -2,16 +2,17 @@ package app
 
 import (
 	"context"
-	_ "embed"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
-
-//go:embed schema.sql
-var schemaSQL string
 
 func OpenDB(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
@@ -45,8 +46,10 @@ func MigrateTokens(ctx context.Context, pool *pgxpool.Pool) error {
 	return err
 }
 
-// SeedUsers 首次启动时写入演示账号(admin/operator/viewer)。
-func SeedUsers(ctx context.Context, pool *pgxpool.Pool) error {
+// SeedAdmin 首次启动时创建 admin 账号:
+// 口令优先取显式传入(来自 0600 文件/环境变量);未提供则生成强随机口令,
+// 写入 <dataDir>/initial-admin-password(0600)并只记录路径,不打印口令本身。
+func SeedAdmin(ctx context.Context, pool *pgxpool.Pool, dataDir string, initPassword string) error {
 	var n int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM users`).Scan(&n); err != nil {
 		return err
@@ -54,21 +57,25 @@ func SeedUsers(ctx context.Context, pool *pgxpool.Pool) error {
 	if n > 0 {
 		return nil
 	}
-	seeds := []struct{ u, p, r string }{
-		{"admin", "admin123", "admin"},
-		{"operator", "operator123", "operator"},
-		{"viewer", "viewer123", "viewer"},
-	}
-	for _, s := range seeds {
-		h, err := bcrypt.GenerateFromPassword([]byte(s.p), bcrypt.DefaultCost)
-		if err != nil {
+	if initPassword == "" {
+		b := make([]byte, 18)
+		if _, err := rand.Read(b); err != nil {
 			return err
 		}
-		if _, err := pool.Exec(ctx,
-			`INSERT INTO users(username,password_hash,role) VALUES($1,$2,$3)`,
-			s.u, string(h), s.r); err != nil {
+		initPassword = base64.RawURLEncoding.EncodeToString(b)
+		path := filepath.Join(dataDir, "initial-admin-password")
+		if err := os.MkdirAll(dataDir, 0o750); err != nil {
 			return err
 		}
+		if err := os.WriteFile(path, []byte(initPassword+"\n"), 0o600); err != nil {
+			return err
+		}
+		slog.Info("已生成初始管理员口令(首次登录后请立即修改)", "file", path)
 	}
-	return nil
+	h, err := bcrypt.GenerateFromPassword([]byte(initPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	_, err = pool.Exec(ctx, `INSERT INTO users(username,password_hash,role) VALUES('admin',$1,'admin')`, string(h))
+	return err
 }

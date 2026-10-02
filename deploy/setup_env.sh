@@ -33,7 +33,8 @@ umask 077
 [ -s "$ETC/pg.dsn" ] || printf 'postgres://zfsmgr:%s@127.0.0.1:5432/zfsmgr\n' "$DBPW" > "$ETC/pg.dsn"
 [ -s "$ETC/agent.token" ] || cp "$TOKEN_FILE" "$ETC/agent.token"
 [ -s "$ETC/data.key" ] || openssl rand -hex 32 > "$ETC/data.key"
-chmod 600 "$ETC/pg.dsn" "$ETC/agent.token" "$ETC/data.key"
+[ -s "$ETC/admin.secret" ] || openssl rand -base64 15 | tr -d '/+=' | cut -c1-16 > "$ETC/admin.secret"
+chmod 600 "$ETC/pg.dsn" "$ETC/agent.token" "$ETC/data.key" "$ETC/admin.secret"
 
 # 4) manager.toml(基线:仅回环监听,由 Caddy/nginx 反代)
 if [ ! -f "$ETC/manager.toml" ]; then
@@ -43,6 +44,7 @@ listen = "127.0.0.1:8080"
 db_url_file = "$ETC/pg.dsn"
 agent_token_file = "$ETC/agent.token"
 data_key_file = "$ETC/data.key"
+init_admin_password_file = "$ETC/admin.secret"
 poll_seconds = 12
 static_dir = ""
 EOF

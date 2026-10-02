@@ -1,0 +1,178 @@
+/* ============================================================
+   ZFS 存储管理平台 · Material You (MD3) 亮/暗双主题
+   语义变量 --my-* 供自定义布局使用;Element Plus 令牌随主题切换。
+   ============================================================ */
+
+:root {
+  /* —— 语义色(亮) —— */
+  --my-bg: #f8f9fb;
+  --my-surface: #ffffff;
+  --my-surface-2: #f1f3f4;
+  --my-text: #202124;
+  --my-text-2: #5f6368;
+  --my-outline: #e0e3e7;
+  --my-primary: #1a73e8;
+  --my-on-primary: #ffffff;
+  --my-primary-container: #dbe6ff;
+  --my-on-primary-container: #0a3d8f;
+  --my-code-bg: #f1f3f4;
+
+  /* —— Element 令牌(亮) —— */
+  --el-color-primary: #1a73e8;
+  --el-color-primary-light-3: #6eabf2;
+  --el-color-primary-light-5: #a8cdf8;
+  --el-color-primary-light-7: #cfe2fb;
+  --el-color-primary-light-8: #e2eefd;
+  --el-color-primary-light-9: #e8f0fe;
+  --el-color-primary-dark-2: #1967d2;
+  --el-color-success: #188038;
+  --el-color-success-light-9: #e6f4ea;
+  --el-color-success-dark-2: #14662d;
+  --el-color-warning: #f9ab00;
+  --el-color-warning-light-9: #fef7e0;
+  --el-color-warning-dark-2: #d39000;
+  --el-color-danger: #d93025;
+  --el-color-danger-light-9: #fce8e6;
+  --el-color-danger-dark-2: #b3261e;
+  --el-color-error: #d93025;
+  --el-color-info: #5f6368;
+
+  --el-text-color-primary: #202124;
+  --el-text-color-regular: #3c4043;
+  --el-text-color-secondary: #5f6368;
+  --el-text-color-placeholder: #9aa0a6;
+  --el-border-color: #dadce0;
+  --el-border-color-light: #e0e3e7;
+  --el-border-color-lighter: #eceff1;
+  --el-fill-color-blank: #ffffff;
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f8f9fb;
+  --el-bg-color-overlay: #ffffff;
+  --el-fill-color-light: #f1f3f4;
+  --el-fill-color-lighter: #f8f9fa;
+
+  --el-border-radius-base: 12px;
+  --el-border-radius-small: 10px;
+  --el-border-radius-round: 999px;
+  --el-font-family: "Google Sans Text", Roboto, "Helvetica Neue", Arial,
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --el-font-size-base: 13px;
+  --el-table-header-text-color: #5f6368;
+  --el-table-header-bg-color: transparent;
+  --el-table-row-hover-bg-color: #f1f3f4;
+  --el-table-border-color: #eceff1;
+}
+
+html[data-theme="dark"] {
+  /* —— 语义色(暗) —— */
+  --my-bg: #1d1e20;
+  --my-surface: #26282b;
+  --my-surface-2: #313337;
+  --my-text: #e3e3e8;
+  --my-text-2: #a6aab2;
+  --my-outline: #3c4043;
+  --my-primary: #8ab4f8;
+  --my-on-primary: #062e6f;
+  --my-primary-container: #0b3d91;
+  --my-on-primary-container: #d3e3fd;
+  --my-code-bg: #313337;
+
+  /* —— Element 令牌(暗) —— */
+  --el-color-primary: #8ab4f8;
+  --el-color-primary-light-3: #669df6;
+  --el-color-primary-light-5: #8ab4f8;
+  --el-color-primary-light-7: #c6dafc;
+  --el-color-primary-light-8: #d3e3fd;
+  --el-color-primary-light-9: #0b3d91;
+  --el-color-primary-dark-2: #aecbfa;
+  --el-color-success: #81c995;
+  --el-color-success-light-9: #0c2e1d;
+  --el-color-success-dark-2: #75c48b;
+  --el-color-warning: #fdd663;
+  --el-color-warning-light-9: #3d2c00;
+  --el-color-warning-dark-2: #fdd663;
+  --el-color-danger: #f28b82;
+  --el-color-danger-light-9: #42130f;
+  --el-color-danger-dark-2: #f28b82;
+  --el-color-error: #f28b82;
+  --el-color-info: #a6aab2;
+
+  --el-text-color-primary: #e3e3e8;
+  --el-text-color-regular: #c9ccd2;
+  --el-text-color-secondary: #a6aab2;
+  --el-text-color-placeholder: #8a8e96;
+  --el-border-color: #4a4d52;
+  --el-border-color-light: #45484d;
+  --el-border-color-lighter: #3c4043;
+  --el-fill-color-blank: #26282b;
+  --el-bg-color: #26282b;
+  --el-bg-color-page: #1d1e20;
+  --el-bg-color-overlay: #2b2d31;
+  --el-fill-color-light: #313337;
+  --el-fill-color-lighter: #2b2d31;
+
+  --el-table-header-text-color: #a6aab2;
+  --el-table-header-bg-color: transparent;
+  --el-table-row-hover-bg-color: #313337;
+  --el-table-border-color: #3c4043;
+  color-scheme: dark;
+}
+
+html, body { margin: 0; background: var(--my-bg); color: var(--my-text); font-family: var(--el-font-family); }
+.page-card { margin: 0; }
+.mono { font-family: "Roboto Mono", Consolas, Menlo, monospace; font-size: 12px; }
+
+/* ---------- MD3 组件质感 ---------- */
+
+.el-card {
+  background: var(--my-surface) !important;
+  border: 1px solid var(--my-outline) !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+.el-card__header { padding: 18px 20px 12px; font-size: 16px; font-weight: 500; color: var(--my-text); border-bottom: 1px solid var(--my-outline) !important; }
+.el-card__body { padding: 16px 20px 18px; }
+
+.el-button { font-weight: 500; border-radius: 999px; }
+.el-button--primary { --el-button-hover-bg-color: #1967d2; }
+html[data-theme="dark"] .el-button--primary { --el-button-hover-bg-color: #aecbfa; }
+.el-button.is-text { color: var(--my-primary); }
+.el-button.is-text:hover { background: color-mix(in srgb, var(--my-primary) 10%, transparent); }
+
+.el-table { background: transparent; }
+.el-table::before { display: none; }
+.el-table th.el-table__cell { background: transparent !important; font-weight: 500; color: var(--my-text-2); }
+.el-table td.el-table__cell { border-bottom: 1px solid var(--my-outline); }
+.el-table .el-table__row:hover > td { background: var(--my-surface-2) !important; }
+
+.el-form-item__label { color: var(--my-text-2); font-weight: 500; }
+.el-input__wrapper, .el-select__wrapper { border-radius: 12px; }
+.el-input__wrapper.is-focus, .el-select__wrapper.is-focused { box-shadow: 0 0 0 2px color-mix(in srgb, var(--my-primary) 40%, transparent) inset !important; }
+
+.el-tag { border-radius: 999px; font-weight: 500; }
+
+.el-dialog { border-radius: 24px; background: var(--my-surface); border: 1px solid var(--my-outline); }
+.el-drawer { background: var(--my-surface); }
+.el-dialog__title, .el-drawer__title { font-weight: 600; color: var(--my-text); }
+html[data-theme="dark"] .el-dialog, html[data-theme="dark"] .el-drawer { background: #2b2d31; }
+
+.el-divider--horizontal { border-top: 1px solid var(--my-outline); }
+.el-divider__text { background: transparent; color: var(--my-text-2); font-weight: 500; font-size: 12px; }
+
+.el-progress-bar__inner { background: var(--my-primary); }
+.el-progress__text { color: var(--my-text-2); }
+
+.el-descriptions__label { color: var(--my-text-2); }
+.el-descriptions__body .el-descriptions__table { --el-table-border-color: var(--my-outline); }
+.el-alert { border-radius: 14px; }
+
+pre.mono.raw, pre.mono.cap {
+  background: var(--my-code-bg);
+  color: var(--my-text);
+  border: 1px solid var(--my-outline);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.el-message-box { border-radius: 20px; }
+.el-popover, .el-select__popper, .el-dropdown__popper { border-radius: 14px !important; }

@@ -1,0 +1,23 @@
+# 构建产物(不入库)
+manager/internal/app/static/dist/
+web/dist/
+web/node_modules/
+manager/bin/
+bin/
+releases/
+*.tar.gz
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 编辑器/系统
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# 运行时/临时
+*.log
+/tmp/

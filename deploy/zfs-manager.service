@@ -1,0 +1,15 @@
+[Unit]
+Description=ZFS Storage Platform Manager (Go)
+After=network.target postgresql.service
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/zfs-platform/bin/zfs-manager -config /etc/zfs-platform/manager.toml
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+# P0 运行 root;生产环境建议降权 + mTLS
+
+[Install]
+WantedBy=multi-user.target

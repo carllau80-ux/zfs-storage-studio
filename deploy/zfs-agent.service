@@ -1,0 +1,15 @@
+[Unit]
+Description=ZFS Storage Platform Node Agent (Python)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m zfsmgr_agent.app -c /etc/zfs-platform/agent.toml
+WorkingDirectory=/opt/zfs-platform/agent
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+== 映射记录 ==
+{"host":"openeuler","dataset":"tank/vol2","iqn":"iqn.2026-09.com.ustc:node1-vol2-n40926","lun_id":0}
+== 目标内部 LUN 表(DB 行) ==
+iqn.2026-09.com.ustc:node1-vol2-n40926|0|tank/vol2

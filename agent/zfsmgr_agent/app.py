@@ -175,7 +175,9 @@ def handle_query(rt: AgentRuntime, kind: str, params: dict) -> dict:
     if kind == "disks":
         return {"disks": sysinfo.disks()}
     if kind == "hba":
-        return {"fc": rt.caps.get("fc", {})}
+        return {"fc": rt.caps.get("fc", {}), **sysinfo.hba_info()}
+    if kind == "hardware":
+        return sysinfo.hardware()
     if kind == "capabilities":
         return rt.caps
     if kind == "metrics":

@@ -10,6 +10,8 @@ PostgreSQL + Vue 3(Material You 亮/暗主题,中英双语),单二进制内嵌�
 - **RAID**(storcli):控制器信息(含 BBU/温度/内存/ECC)、VD(虚拟磁盘)与 PD(物理磁盘)状态、
   RAID 0/1/5/6/10/50/60 创建、删除、属性(名称/读写/IO/访问策略)修改、**分页 RAID 事件日志**;
   默认只读,生产/验证节点可由管理员**输入本人口令临时解锁(5~60 分钟,到期/Agent 重启自动回锁)**。
+- **节点硬件**:节点详情展示操作系统(含官方图标)、CPU 型号/核心/主频、内存/交换、RAID 卡、
+  物理磁盘(型号/序列号/WWN/介质/挂载)、FC/SAS/SCSI HBA 与 PCI 存储控制器。
 - **安全基线**:TOML 配置 + 0600 密钥文件、令牌 SHA-256 哈希、CHAP 凭据 AES-GCM 加密、RBAC
   (admin/operator/viewer)、审计留痕、登录限速、TLS 8443 入口、健康检查/Prometheus 指标。
 
@@ -29,13 +31,13 @@ PostgreSQL + Vue 3(Material You 亮/暗主题,中英双语),单二进制内嵌�
 - 使用手册(Word):`docs/使用手册.docx`
 - 开发文档:`docs/开发文档.md`(架构/API/测试/踩坑)
 - 部署文档:`docs/部署文档.md`(一键安装/手工部署/只读 Agent/排障)
-- 发布说明:`docs/RELEASE-0.94.md`
-- 一键安装包(0.94):`releases/storman-0.94.tar.gz`
+- 发布说明:`docs/RELEASE-0.95.md`
+- 一键安装包(0.95):`releases/storman-0.95.tar.gz`
   ```bash
-  tar -xzf storman-0.94.tar.gz -C /opt && cd /opt/storman-0.94
+  tar -xzf storman-0.95.tar.gz -C /opt && cd /opt/storman-0.95
   ./deploy/install.sh     # root;缺省安装到 /opt/storman,/etc/storman
   ```
-  打包:`bash scripts/package.sh 0.94`(需 go/node 构建工具;`REBUILD_WEB=1` 强制重建前端)
+  打包:`bash scripts/package.sh 0.95`(需 go/node 构建工具;`REBUILD_WEB=1` 强制重建前端)
 - 安装器默认服务名:`storman-manager` / `storman-agent`;**数据库仍为 `zfsmgr`**,
   历史部署的 `zfs-*` 单元与 `/opt/zfs-platform` 路径保持不变。
 
@@ -89,7 +91,8 @@ deploy/   schema.sql、storman/zfs 单元、install.sh、nginx TLS 示例
 
 - `e2e/smoke.sh`:**PASS=41 FAIL=0**(RBAC、建池/scrub/销毁、zvol/mkfs/扩容、快照/回滚、CHAP 真机
   iSCSI 读写与 sha1 往返、解映射、审计)。
-- Agent pytest:**17 passed**(ZFS 解析 fixture、RAID 只读/校验/分页/硬件字段);Manager `go test ./...` 通过。
+- Agent pytest:**19 passed**(ZFS 解析、RAID 只读/校验/分页/硬件字段、节点 OS/CPU/内存/磁盘/HBA 采集);
+  Manager `go test ./...` 通过。
 - 生产节点只读验证:控制器/VD/PD/事件查询与分页成功;Manager RAID 创建/删除返回 **403**,Agent 直连返回
   `READ_ONLY`;口令临时解锁/回锁接口验证成功(解锁后未执行任何写操作);**VD 数保持 2、PD 数保持 5,
   未执行任何 storcli 写命令**。

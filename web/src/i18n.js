@@ -11,6 +11,22 @@ export function setLang(v) {
 
 // —— 词典:整句短语 + 高频词元(自动去重,按需补充) ——
 const D = {
+  // 节点硬件
+  '系统': 'System', '主机名': 'Hostname', '内核 / 架构': 'Kernel / architecture',
+  '运行时间': 'Uptime', '刷新硬件': 'Refresh hardware', 'CPU': 'CPU',
+  '型号': 'Model', '逻辑处理器': 'Logical CPUs', '物理核心': 'Physical cores',
+  '插槽 / 每插槽核心': 'Sockets / cores per socket', '主频': 'Frequency',
+  '内存': 'Memory', '可用': 'Available', '空闲': 'Free', '交换': 'Swap',
+  'RAID 卡': 'RAID card', '管理 RAID': 'Manage RAID', '磁盘': 'Disks',
+  '设备': 'Device', '序列号': 'Serial number', '接口/介质': 'Interface / media',
+  '挂载点': 'Mountpoints', '分区': 'Partitions',
+  'HBA / 存储控制器': 'HBA / storage controllers', '描述': 'Description',
+  '未获取到 CPU 信息': 'CPU information unavailable',
+  '未获取到内存信息': 'Memory information unavailable',
+  '未获取到物理磁盘信息': 'Physical disk information unavailable',
+  '未检测到 FC/SAS HBA 卡(RAID 卡请见上方)': 'No FC/SAS HBA detected (see RAID card above)',
+  '未检测到 RAID 卡(storcli 不可用)': 'No RAID card detected (storcli unavailable)',
+  'RAID 信息读取失败或暂无控制器': 'Failed to read RAID information or no controller',
   // RAID
   'RAID 管理(经节点 Agent / storcli)': 'RAID management (via node agent / storcli)',
   '输入密码临时解锁': 'Enter password to unlock', '临时解锁写操作': 'Temporarily unlock writes',

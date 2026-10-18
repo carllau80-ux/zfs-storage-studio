@@ -11,13 +11,23 @@
         </el-select>
         <el-button @click="loadAll" :loading="busy">刷新</el-button>
         <span style="flex:1"></span>
-        <el-tag v-if="allowMutation" size="small" type="success">可写节点</el-tag>
+        <el-tag v-if="allowMutation" size="small" type="success">
+          {{ mutation?.unlocked ? '已临时解锁' : '可写节点' }}</el-tag>
         <el-tag v-else size="small" type="warning">只读节点</el-tag>
       </div>
 
-      <el-alert v-if="nodeId && !allowMutation" type="warning" :closable="false" show-icon
-                title="只读模式:该节点被配置为禁止 RAID 写操作(生产/验证环境),创建/删除/改属性已禁用,仅可查看。"
-                style="margin-bottom:14px" />
+      <div v-if="nodeId && !allowMutation" class="readonly-row">
+        <el-alert type="warning" :closable="false" show-icon style="flex:1"
+                  title="只读模式:该节点被配置为禁止 RAID 写操作(生产/验证环境),创建/删除/改属性已禁用,仅可查看。" />
+        <el-button v-if="isAdmin()" type="warning" @click="openUnlock">输入密码临时解锁</el-button>
+        <span v-else class="hint">仅管理员可临时解锁</span>
+      </div>
+
+      <div v-if="mutation?.unlocked" class="readonly-row">
+        <el-alert type="success" :closable="false" show-icon style="flex:1"
+                  :title="`写操作已临时解锁,剩余 ${remainingText} 后自动回锁(到期或 Agent 重启即恢复只读)`" />
+        <el-button type="danger" plain @click="relock">立即回锁</el-button>
+      </div>
 
       <el-empty v-if="!raidNodes.length" description="暂无支持 RAID 的节点(未发现 storcli 或控制器)" />
 
@@ -35,10 +45,11 @@
           <el-descriptions-item label="端口 / PD / DG / VD">
             {{ curCtrl.ports ?? '-' }} / {{ curCtrl.pds ?? '-' }} / {{ curCtrl.dgs ?? '-' }} / {{ curCtrl.vds ?? '-' }}
           </el-descriptions-item>
-          <el-descriptions-item label="BBU">{{ curCtrl.bbu || '无' }}</el-descriptions-item>
-          <el-descriptions-item label="温度">{{ curCtrl.temperature || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="告警" :span="3">{{ curCtrl.alarm || '无' }}</el-descriptions-item>
-          <el-descriptions-item label="内存" :span="3">{{ curCtrl.memory || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="BBU">{{ bbuText(curCtrl) }}</el-descriptions-item>
+          <el-descriptions-item label="温度">{{ tempText(curCtrl.temperature) }}</el-descriptions-item>
+          <el-descriptions-item label="内存">{{ memoryText(curCtrl) }}</el-descriptions-item>
+          <el-descriptions-item label="内存 ECC">{{ eccText(curCtrl) }}</el-descriptions-item>
+          <el-descriptions-item label="告警" :span="2">{{ curCtrl.alarm || '无' }}</el-descriptions-item>
         </el-descriptions>
 
         <el-tabs v-model="tab" style="margin-top:8px" @tab-change="onTab">
@@ -98,12 +109,12 @@
           <el-tab-pane label="RAID 日志" name="events">
             <div class="toolbar">
               <el-button @click="loadEvents" :loading="evBusy">刷新日志</el-button>
-              <el-select v-model="evLimit" style="width:120px" @change="loadEvents">
-                <el-option :value="50" label="最近 50 条" />
-                <el-option :value="100" label="最近 100 条" />
-                <el-option :value="200" label="最近 200 条" />
+              <span class="hint">共 {{ evTotal }} 条,每页</span>
+              <el-select v-model="evPageSize" style="width:100px" @change="onPageSize">
+                <el-option :value="50" label="50 条" />
+                <el-option :value="100" label="100 条" />
+                <el-option :value="200" label="200 条" />
               </el-select>
-              <span class="hint">日志总数:{{ evTotal }}</span>
             </div>
             <el-table :data="events" v-loading="evBusy" size="small" empty-text="暂无日志">
               <el-table-column type="expand">
@@ -113,9 +124,40 @@
               <el-table-column prop="time" label="时间" width="230" />
               <el-table-column prop="event" label="事件" min-width="360" show-overflow-tooltip />
             </el-table>
+            <div class="pager">
+              <el-pagination v-model:current-page="evPage" v-model:page-size="evPageSize"
+                             :total="evTotal" :page-sizes="[50, 100, 200]"
+                             layout="total, sizes, prev, pager, next, jumper"
+                             @current-change="loadEvents" @size-change="onPageSize" />
+            </div>
           </el-tab-pane>
         </el-tabs>
       </template>
+
+      <!-- 临时解锁 -->
+      <el-dialog v-model="unlockDlg" title="临时解锁写操作" width="440px" @closed="unlockForm.password = ''">
+        <el-alert type="warning" :closable="false" show-icon style="margin-bottom:12px"
+                  title="解锁后该节点的 ZFS/RAID 写操作将临时放开,到期自动回锁。" />
+        <el-form label-width="100px">
+          <el-form-item label="当前账号口令">
+            <el-input v-model="unlockForm.password" type="password" show-password
+                      placeholder="请输入当前登录账号的口令" @keyup.enter="submitUnlock" />
+          </el-form-item>
+          <el-form-item label="解锁时长">
+            <el-select v-model="unlockForm.minutes" style="width:180px">
+              <el-option :value="5" label="5 分钟" />
+              <el-option :value="15" label="15 分钟" />
+              <el-option :value="30" label="30 分钟" />
+              <el-option :value="60" label="60 分钟" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="unlockDlg = false">取消</el-button>
+          <el-button type="warning" :loading="unlockBusy" :disabled="!unlockForm.password"
+                     @click="submitUnlock">解锁</el-button>
+        </template>
+      </el-dialog>
 
       <!-- 创建 VD -->
       <el-dialog v-model="createDlg" title="创建 RAID 组(写操作)" width="620px">
@@ -201,8 +243,8 @@
   </div>
 </template>
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { api, canWrite } from '../api.js'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { api, canWrite, isAdmin } from '../api.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const nodes = ref([])
@@ -218,7 +260,12 @@ const busy = ref(false)
 const evBusy = ref(false)
 const events = ref([])
 const evTotal = ref(0)
-const evLimit = ref(100)
+const evPage = ref(1)
+const evPageSize = ref(50)
+const mutation = ref(null)
+const nowTs = ref(Date.now())
+const unlockDlg = ref(false), unlockBusy = ref(false)
+const unlockForm = reactive({ password: '', minutes: 15 })
 const createDlg = ref(false)
 const setDlg = ref(false)
 const createForm = reactive({ level: '5', drives: [], name: '', stripesize: '', pdperarray: '', confirm: '' })
@@ -227,6 +274,39 @@ const setForm = reactive({ vd: '', name: '', writepolicy: '', readpolicy: '', io
 const curCtrl = computed(() => controllers.value.find(c => c.id === ctrl.value) || null)
 const createConfirmHint = computed(() =>
   'CREATE ' + (createForm.name ? createForm.name : createForm.level))
+const remainingSec = computed(() => {
+  if (!mutation.value?.unlocked || !mutation.value?.expires_at) return 0
+  return Math.max(0, Math.round((Date.parse(mutation.value.expires_at) - nowTs.value) / 1000))
+})
+const remainingText = computed(() => {
+  const s = remainingSec.value
+  if (s <= 0) return '0 秒'
+  const m = Math.floor(s / 60), r = s % 60
+  return m > 0 ? `${m} 分 ${r} 秒` : `${r} 秒`
+})
+let clockTimer = null
+let expiryRefreshing = false
+
+function bbuText(c) {
+  const v = (c?.bbu || '').toString()
+  if (!v) return '不可用'
+  const k = v.toLowerCase()
+  if (k === 'absent' || k === 'msng') return '缺失(未配置)'
+  if (k === 'na') return '不可用(NA)'
+  return c?.bbu_status ? `${v} / ${c.bbu_status}` : v
+}
+function tempText(v) {
+  return v === undefined || v === null || v === '' ? '不可用' : `${v} °C`
+}
+function memoryText(c) {
+  let t = c?.memory || '不可用'
+  if (c?.cache_fw_mb) t += `(FW Cache ${c.cache_fw_mb} MB)`
+  return t
+}
+function eccText(c) {
+  if (c?.memory_correctable === undefined && c?.memory_uncorrectable === undefined) return '不可用'
+  return `可纠正 ${c?.memory_correctable ?? 0} / 不可纠正 ${c?.memory_uncorrectable ?? 0}`
+}
 
 function vdStateType(s) {
   s = (s || '').toLowerCase()
@@ -259,6 +339,8 @@ async function onNodeChange() {
   controllers.value = []
   ctrl.value = 0
   vds.value = []; pds.value = []; events.value = []
+  mutation.value = null
+  evPage.value = 1; evTotal.value = 0; evPageSize.value = 50
   await loadAll()
 }
 
@@ -266,11 +348,13 @@ async function loadAll() {
   if (!nodeId.value) return
   busy.value = true
   try {
-    const detail = raidNodes.value.find(n => n.id === nodeId.value)
-    allowMutation.value = !!detail?.capabilities?.raid?.allow_mutation
-    const cres = await api.get(`/nodes/${nodeId.value}/raid/controllers`)
+    const [cres, mres] = await Promise.all([
+      api.get(`/nodes/${nodeId.value}/raid/controllers`),
+      api.get(`/nodes/${nodeId.value}/mutation`).catch(() => null)
+    ])
     controllers.value = cres.controllers || []
-    allowMutation.value = !!cres.allow_mutation
+    mutation.value = mres
+    allowMutation.value = mres ? !!mres.raid_effective : !!cres.allow_mutation
     if (!controllers.value.length) return
     if (!controllers.value.some(c => c.id === ctrl.value)) ctrl.value = controllers.value[0].id
     const base = `/nodes/${nodeId.value}/raid/controllers/${ctrl.value}`
@@ -289,10 +373,45 @@ async function loadEvents() {
   evBusy.value = true
   try {
     const r = await api.get(`/nodes/${nodeId.value}/raid/controllers/${ctrl.value}/events`,
-      { params: { limit: evLimit.value } })
+      { params: { page: evPage.value, page_size: evPageSize.value } })
     evTotal.value = r.total || 0
     events.value = r.entries || []
+    if (r.page && r.page !== evPage.value) evPage.value = r.page
   } finally { evBusy.value = false }
+}
+function onPageSize() {
+  evPage.value = 1
+  loadEvents()
+}
+function openUnlock() {
+  if (!isAdmin()) { ElMessage.warning('仅管理员可临时解锁'); return }
+  unlockForm.password = ''
+  unlockForm.minutes = 15
+  unlockDlg.value = true
+}
+async function submitUnlock() {
+  if (!unlockForm.password) return
+  unlockBusy.value = true
+  try {
+    await api.post(`/nodes/${nodeId.value}/unlock`, {
+      password: unlockForm.password, ttl_s: unlockForm.minutes * 60
+    })
+    ElMessage.success(`已临时解锁 ${unlockForm.minutes} 分钟`)
+    unlockDlg.value = false
+    await loadAll()
+  } catch { /* 拦截器已提示 */ } finally { unlockBusy.value = false }
+}
+async function relock() {
+  await api.post(`/nodes/${nodeId.value}/lock`)
+  ElMessage.success('已重新进入只读模式')
+  await loadAll()
+}
+async function refreshMutation() {
+  try {
+    const m = await api.get(`/nodes/${nodeId.value}/mutation`)
+    mutation.value = m
+    allowMutation.value = !!m.raid_effective
+  } catch { /* 保留当前状态 */ }
 }
 
 function openCreate() {
@@ -347,10 +466,21 @@ async function removeVD(row) {
 onMounted(async () => {
   await loadNodes()
   await loadAll()
+  clockTimer = setInterval(async () => {
+    nowTs.value = Date.now()
+    if (mutation.value?.unlocked && remainingSec.value <= 0 && !expiryRefreshing) {
+      expiryRefreshing = true
+      await refreshMutation()
+      expiryRefreshing = false
+    }
+  }, 1000)
 })
+onUnmounted(() => clearInterval(clockTimer))
 </script>
 <style scoped>
 .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.readonly-row { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+.pager { margin-top: 12px; display: flex; justify-content: flex-end; }
 .hint { color: var(--my-text-2); font-size: 12px; }
 .ctrl-grid { margin-bottom: 10px; }
 .events { max-height: 56vh; overflow: auto; background: var(--my-surface-2); padding: 12px;

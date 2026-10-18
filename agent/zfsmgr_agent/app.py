@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime, timezone
 import logging
 import os
 import threading
@@ -49,6 +50,30 @@ class AgentRuntime:
         self.caps["lio_available"] = RTSRoot is not None
         self.metrics = MetricsSampler()
         self.lock = threading.RLock()
+        # 临时解锁(仅内存态,TTL 后自动回锁;重启即恢复只读)
+        self._mutation_until = 0.0
+
+    def mutation_unlocked(self) -> bool:
+        return time.time() < self._mutation_until
+
+    def mutation_state(self) -> dict:
+        unlocked = self.mutation_unlocked()
+        remaining = max(0, int(self._mutation_until - time.time())) if unlocked else 0
+        exp = ""
+        if unlocked:
+            exp = datetime.fromtimestamp(self._mutation_until, tz=timezone.utc).isoformat()
+        return {
+            "config_allow": bool(self.cfg.allow_mutation),
+            "raid_config_allow": bool(self.cfg.raid_allow_mutation),
+            "unlocked": unlocked,
+            "expires_at": exp,
+            "remaining_s": remaining,
+            "effective": bool(self.cfg.allow_mutation or unlocked),
+            "raid_effective": bool(self.cfg.raid_allow_mutation or unlocked),
+        }
+
+    def raid_writable(self) -> bool:
+        return bool(self.cfg.raid_allow_mutation or self.mutation_unlocked())
 
 
 def make_app(cfg: Config) -> FastAPI:
@@ -95,8 +120,9 @@ def make_app(cfg: Config) -> FastAPI:
         o = body.get("op", "")
         params = body.get("params") or {}
         try:
-            ensure_writable(rt.cfg)
             with rt.lock:
+                if o not in ("mutation_unlock", "mutation_lock"):
+                    ensure_writable(rt.cfg, rt.mutation_unlocked())
                 res = handle_op(rt, o, params)
             return {"ok": True, "result": res or {}}
         except Exception as e:
@@ -109,9 +135,9 @@ def make_app(cfg: Config) -> FastAPI:
     return app
 
 
-def ensure_writable(cfg: Config) -> None:
-    """节点写保护:生产节点只允许查询,任何变更操作在 Agent 侧兜底拒绝。"""
-    if not cfg.allow_mutation:
+def ensure_writable(cfg: Config, unlocked: bool = False) -> None:
+    """节点写保护:只读节点仅允许查询;输入密码临时解锁的窗口期内放行。"""
+    if not cfg.allow_mutation and not unlocked:
         raise ZfsError("当前节点为只读模式(生产环境),所有变更操作已禁用", code="READ_ONLY")
 
 
@@ -168,7 +194,11 @@ def handle_query(rt: AgentRuntime, kind: str, params: dict) -> dict:
         return {"pds": rt.raid.pds(int(params.get("controller", 0)))}
     if kind == "raid_events":
         return rt.raid.events(int(params.get("controller", 0)),
-                              int(params.get("limit", 100)))
+                              int(params.get("page", 1)),
+                              int(params.get("page_size", 50)))
+    if kind == "mutation_state":
+        with rt.lock:
+            return rt.mutation_state()
     raise ZfsError(f"未知查询: {kind}", code="VALIDATION")
 
 
@@ -325,7 +355,22 @@ def handle_op(rt: AgentRuntime, op: str, p: dict) -> dict:
     if op == "lio_config_save":
         rt.lio.save()
         return {"saved": True}
+    # ---- 临时解锁(仅内存态;由 Manager 在校验管理员口令后调用) ----
+    if op == "mutation_unlock":
+        ttl = int(p.get("ttl_s", 900) or 900)
+        ttl = max(60, min(ttl, 3600))
+        rt._mutation_until = time.time() + ttl
+        rt.raid.allow_mutation = rt.raid_writable()
+        log.warning("节点临时解锁写操作: ttl=%ss", ttl)
+        return rt.mutation_state()
+    if op == "mutation_lock":
+        rt._mutation_until = 0
+        rt.raid.allow_mutation = rt.raid_writable()
+        log.warning("节点写操作已重新锁定")
+        return rt.mutation_state()
     # ---- RAID(默认只读;开启 allow_mutation 后仍需确认串) ----
+    if op.startswith("raid_"):
+        rt.raid.allow_mutation = rt.raid_writable()
     if op == "raid_vd_create":
         return rt.raid.create_vd(int(p.get("controller", 0)), str(p.get("level", "")),
                                  p.get("drives") or [], str(p.get("name", "")),

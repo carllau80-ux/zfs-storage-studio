@@ -13,6 +13,14 @@ export function setLang(v) {
 const D = {
   // RAID
   'RAID 管理(经节点 Agent / storcli)': 'RAID management (via node agent / storcli)',
+  '输入密码临时解锁': 'Enter password to unlock', '临时解锁写操作': 'Temporarily unlock writes',
+  '当前账号口令': 'Current account password', '解锁时长': 'Unlock duration',
+  '已临时解锁': 'Temporarily unlocked', '立即回锁': 'Lock now',
+  '仅管理员可临时解锁': 'Only admins can unlock', '写操作已临时解锁': 'Writes temporarily unlocked',
+  '关联磁盘': 'Associated disks', '所属 vdev': 'Vdev group', '设备路径': 'Device path',
+  '读 / 写 / 校验错误': 'Read / write / checksum errors', '内存 ECC': 'Memory ECC',
+  '缺失(未配置)': 'Absent (not configured)', '不可用(NA)': 'Unavailable (NA)',
+  '可纠正': 'Correctable', '不可纠正': 'Uncorrectable',
   'RAID 级别': 'RAID level', '创建 RAID 组': 'Create RAID group', '删除 RAID 组': 'Delete RAID group',
   '虚拟磁盘 VD': 'Virtual drives (VD)', '物理磁盘 PD': 'Physical drives (PD)', 'RAID 日志': 'RAID log',
   '只读节点': 'Read-only node', '可写节点': 'Writable node',

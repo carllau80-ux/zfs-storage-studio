@@ -67,6 +67,9 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/nodes/{id}", auth(a.requireRole("admin")(a.auditWrap("node", a.handleNodeDelete))))
 	mux.HandleFunc("GET /api/v1/nodes/{id}/sessions", auth(a.handleNodeSessions))
 	mux.HandleFunc("GET /api/v1/nodes/{id}/capabilities", auth(a.handleNodeCapabilities))
+	mux.HandleFunc("GET /api/v1/nodes/{id}/mutation", auth(a.handleNodeMutationState))
+	mux.HandleFunc("POST /api/v1/nodes/{id}/unlock", auth(a.requireRole("admin")(a.auditWrap("node", a.handleNodeUnlock))))
+	mux.HandleFunc("POST /api/v1/nodes/{id}/lock", auth(a.requireRole("admin")(a.auditWrap("node", a.handleNodeLock))))
 
 	// --- 池 ---
 	mux.HandleFunc("GET /api/v1/pools", auth(a.handlePoolsList))

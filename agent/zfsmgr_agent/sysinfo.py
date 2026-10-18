@@ -6,7 +6,7 @@ import json
 import os
 import subprocess
 
-AGENT_VERSION = "0.2.0"
+AGENT_VERSION = "0.3.0"
 
 
 def _run(argv: list[str]) -> tuple[int, str, str]:

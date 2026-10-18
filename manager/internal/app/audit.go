@@ -123,6 +123,10 @@ func actionLabel(method, path string) string {
 		return "创建用户"
 	case strings.HasPrefix(p, "/users/") && method == "PATCH":
 		return "修改用户"
+	case strings.HasSuffix(p, "/unlock") && method == "POST":
+		return "临时解锁节点写操作"
+	case strings.HasSuffix(p, "/lock") && method == "POST":
+		return "重新锁定节点写操作"
 	case strings.HasPrefix(p, "/nodes/") && method == "DELETE":
 		return "移除节点"
 	case strings.HasSuffix(p, "/logout"):

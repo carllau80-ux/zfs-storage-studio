@@ -1,13 +1,8 @@
 package app
 
-import (
-	"encoding/json"
-	"net/http/httptest"
-	"strings"
-	"testing"
-)
+import "testing"
 
-func TestRaidCapabilitiesAndWriteGate(t *testing.T) {
+func TestRaidCapabilities(t *testing.T) {
 	a := &App{}
 
 	ro := &NodeRow{Name: "prod", CapJSON: `{"raid":{"available":true,"allow_mutation":false}}`}
@@ -15,26 +10,18 @@ func TestRaidCapabilitiesAndWriteGate(t *testing.T) {
 	if !avail || allow {
 		t.Fatalf("raidCap = %v,%v; want true,false", avail, allow)
 	}
-	rec := httptest.NewRecorder()
-	if a.raidWriteGate(rec, ro) {
-		t.Fatal("read-only node must be rejected")
-	}
-	if rec.Code != 403 {
-		t.Fatalf("status = %d; want 403", rec.Code)
-	}
-	var body map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-	e, _ := body["error"].(map[string]any)
-	if e["code"] != "RAID_READ_ONLY" {
-		t.Fatalf("code = %v; want RAID_READ_ONLY", e["code"])
+	if raidStaticWritable(ro) {
+		t.Fatal("read-only node must not be statically writable")
 	}
 
 	rw := &NodeRow{CapJSON: `{"raid":{"available":true,"allow_mutation":true}}`}
-	rec = httptest.NewRecorder()
-	if !a.raidWriteGate(rec, rw) || rec.Code != 200 {
-		t.Fatalf("writable node rejected: %d", rec.Code)
+	if !raidStaticWritable(rw) {
+		t.Fatal("writable node should be statically writable")
+	}
+
+	blocked := &NodeRow{CapJSON: `{"allow_mutation":false,"raid":{"available":true,"allow_mutation":true}}`}
+	if raidStaticWritable(blocked) {
+		t.Fatal("node-level read-only must override raid allow")
 	}
 
 	none := &NodeRow{CapJSON: `{}`}
@@ -44,13 +31,16 @@ func TestRaidCapabilitiesAndWriteGate(t *testing.T) {
 	}
 }
 
-func TestRaidReadOnlyMessageMentionsNode(t *testing.T) {
-	a := &App{}
-	n := &NodeRow{Name: "prod2128", CapJSON: `{"raid":{"available":true,"allow_mutation":false}}`}
-	rec := httptest.NewRecorder()
-	a.raidWriteGate(rec, n)
-	if !strings.Contains(rec.Body.String(), "prod2128") ||
-		!strings.Contains(rec.Body.String(), "只读模式") {
-		t.Fatalf("gate message lacks node/read-only hint: %s", rec.Body.String())
+func TestRaidWriteAllowedWithTemporaryUnlock(t *testing.T) {
+	ro := &NodeRow{CapJSON: `{"raid":{"available":true,"allow_mutation":false}}`}
+	if raidWriteAllowed(ro, map[string]any{"raid_effective": false}) {
+		t.Fatal("locked read-only node must reject writes")
+	}
+	if !raidWriteAllowed(ro, map[string]any{"raid_effective": true}) {
+		t.Fatal("temporarily unlocked node should allow writes")
+	}
+	rw := &NodeRow{CapJSON: `{"raid":{"available":true,"allow_mutation":true}}`}
+	if !raidWriteAllowed(rw, nil) {
+		t.Fatal("statically writable node should allow writes")
 	}
 }

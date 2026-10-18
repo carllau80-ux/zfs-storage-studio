@@ -72,18 +72,49 @@ def test_pds_parse(monkeypatch):
 def test_events_tail(monkeypatch):
     c = RaidClient("/x")
     monkeypatch.setattr(c, "available", lambda: True)
-    text = "\n".join(f"seqNum: {i}\nTime: 2026-10-18 10:00:0{i}\nEvent Description: test {i}\n"
-                     for i in range(5))
+    text = "\n".join(f"seqNum: {i}\nTime: 2026-10-18 10:00:00\nEvent Description: test {i}\n"
+                     for i in range(25))
     monkeypatch.setattr(c, "_run", lambda args, timeout=None: text)
-    r = c.events(0, limit=2)
-    assert r["total"] == 5 and r["returned"] == 2
-    assert r["entries"][0]["seq"] == "3" and r["entries"][-1]["seq"] == "4"
-    assert r["entries"][-1]["event"] == "test 4"
-    assert "seqNum: 4" in r["entries"][-1]["raw"]
+    r = c.events(0, page=2, page_size=10)
+    assert r["total"] == 25 and r["pages"] == 3 and r["returned"] == 10
+    assert r["entries"][0]["seq"] == "10" and r["entries"][-1]["seq"] == "19"
+    assert r["entries"][-1]["event"] == "test 19"
+    assert "seqNum: 19" in r["entries"][-1]["raw"]
 
 
 def test_node_read_only_guard():
     ensure_writable(Config(allow_mutation=True))
+    ensure_writable(Config(allow_mutation=False), unlocked=True)
     with pytest.raises(ZfsError) as e:
         ensure_writable(Config(allow_mutation=False))
     assert e.value.code == "READ_ONLY"
+
+
+def test_controller_hw_fields(monkeypatch):
+    c = RaidClient("/x")
+    monkeypatch.setattr(c, "available", lambda: True)
+
+    def fake_json(args):
+        if args == ["show", "J"]:
+            return {"Controllers": [{"Response Data": {"System Overview": [
+                {"Ctl": 0, "Model": "MegaRAID", "Ports": 8, "PDs": 5, "DGs": 2,
+                 "VDs": 2, "BBU": "Msng", "Hlth": "Opt"}]}}]}
+        return {"Controllers": [{"Response Data": {
+            "Basics": {"Model": "AVAGO MegaRAID SAS 9364-8i", "Serial Number": "SK1",
+                       "SAS Address": "5006", "PCI Address": "00:02:00:00"},
+            "Status": {"Controller Status": "Optimal", "BBU Status": "NA",
+                       "Memory Correctable Errors": 0, "Memory Uncorrectable Errors": 0},
+            "HwCfg": {"BBU": "Absent", "Alarm": "On",
+                      "On Board Memory Size": "1024MB",
+                      "Current Size of FW Cache (MB)": 629,
+                      "ROC temperature(Degree Celsius)": 71},
+            "Version": {"Firmware Version": "4.680", "Bios Version": "6.36",
+                        "Driver Name": "megaraid_sas", "Driver Version": "07.7"},
+        }}]}
+    monkeypatch.setattr(c, "_json", fake_json)
+    row = c.controllers()[0]
+    assert row["model"] == "AVAGO MegaRAID SAS 9364-8i"
+    assert row["bbu"] == "Absent" and row["bbu_status"] == "NA"
+    assert row["temperature"] == 71 and row["memory"] == "1024MB"
+    assert row["memory_correctable"] == 0
+    assert row["health"] == "Optimal"

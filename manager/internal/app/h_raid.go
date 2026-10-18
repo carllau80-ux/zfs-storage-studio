@@ -36,11 +36,42 @@ func (a *App) raidNode(w http.ResponseWriter, r *http.Request) *NodeRow {
 	return n
 }
 
-// raidWriteGate 只读节点直接 403,不触达 Agent。
-func (a *App) raidWriteGate(w http.ResponseWriter, n *NodeRow) bool {
-	if _, allow := a.raidCap(n); !allow {
+// raidStaticWritable 节点配置本身是否允许 RAID 写(且未开启节点级只读)。
+func raidStaticWritable(n *NodeRow) bool {
+	a := &App{}
+	_, allow := a.raidCap(n)
+	if !allow {
+		return false
+	}
+	caps := a.nodeCapMap(n)
+	if v, ok := caps["allow_mutation"].(bool); ok && !v {
+		return false
+	}
+	return true
+}
+
+// raidWriteAllowed 综合静态能力与 Agent 实时解锁状态。
+func raidWriteAllowed(n *NodeRow, state map[string]any) bool {
+	if raidStaticWritable(n) {
+		return true
+	}
+	v, _ := state["raid_effective"].(bool)
+	return v
+}
+
+// raidWriteGate 只读节点 403;若节点已通过口令临时解锁,则以 Agent 实时状态为准。
+func (a *App) raidWriteGate(w http.ResponseWriter, r *http.Request, n *NodeRow) bool {
+	if raidStaticWritable(n) {
+		return true
+	}
+	st, err := a.agentQuery(r.Context(), n, "mutation_state", nil)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, "AGENT", "读取节点写保护状态失败: %v", err)
+		return false
+	}
+	if !raidWriteAllowed(n, st) {
 		writeErr(w, http.StatusForbidden, "RAID_READ_ONLY",
-			"节点 %s 为只读模式(生产/验证环境),RAID 写操作已禁用", n.Name)
+			"节点 %s 为只读模式(生产/验证环境),请先输入密码临时解锁", n.Name)
 		return false
 	}
 	return true
@@ -99,12 +130,16 @@ func (a *App) handleRaidEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cid := a.raidCtrlParam(r)
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit <= 0 {
-		limit = 100
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page <= 0 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+	if pageSize <= 0 {
+		pageSize = 50
 	}
 	res, err := a.agentQuery(r.Context(), n, "raid_events",
-		map[string]any{"controller": cid, "limit": limit})
+		map[string]any{"controller": cid, "page": page, "page_size": pageSize})
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, "AGENT", "%v", err)
 		return
@@ -127,7 +162,7 @@ func (a *App) handleRaidVDCreate(w http.ResponseWriter, r *http.Request) {
 	if n == nil {
 		return
 	}
-	if !a.raidWriteGate(w, n) {
+	if !a.raidWriteGate(w, r, n) {
 		return
 	}
 	var req raidVDCreateReq
@@ -156,7 +191,7 @@ func (a *App) handleRaidVDDelete(w http.ResponseWriter, r *http.Request) {
 	if n == nil {
 		return
 	}
-	if !a.raidWriteGate(w, n) {
+	if !a.raidWriteGate(w, r, n) {
 		return
 	}
 	cid, _ := strconv.Atoi(r.URL.Query().Get("controller"))
@@ -185,7 +220,7 @@ func (a *App) handleRaidVDSet(w http.ResponseWriter, r *http.Request) {
 	if n == nil {
 		return
 	}
-	if !a.raidWriteGate(w, n) {
+	if !a.raidWriteGate(w, r, n) {
 		return
 	}
 	var req raidVDSetReq

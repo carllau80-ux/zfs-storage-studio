@@ -43,6 +43,31 @@
                 </template>
               </el-table-column>
             </el-table>
+
+            <el-divider content-position="left" style="margin:10px 0 8px">
+              关联磁盘 <template v-if="poolDisks[row.id]">({{ poolDisks[row.id].length }})</template>
+            </el-divider>
+            <span v-if="!poolDisks[row.id]" style="color:#999;font-size:12px">加载中…</span>
+            <span v-else-if="!poolDisks[row.id].length" style="color:#999;font-size:12px">未取得磁盘信息</span>
+            <el-table v-else :data="poolDisks[row.id]" size="small" border>
+              <el-table-column prop="name" label="设备" width="130" />
+              <el-table-column prop="group" label="所属 vdev" width="140" show-overflow-tooltip />
+              <el-table-column label="状态" width="100">
+                <template #default="{ row: d }">
+                  <el-tag size="small" :type="d.state === 'ONLINE' ? 'success' : 'danger'">{{ d.state }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="path" label="设备路径" min-width="180" show-overflow-tooltip />
+              <el-table-column label="容量" width="110">
+                <template #default="{ row: d }">{{ fmtBytes(d.total_bytes) }}</template>
+              </el-table-column>
+              <el-table-column label="读 / 写 / 校验错误" width="160">
+                <template #default="{ row: d }">
+                  <span :class="{ err: (Number(d.read) || 0) + (Number(d.write) || 0) + (Number(d.cksum) || 0) > 0 }">
+                    {{ d.read }} / {{ d.write }} / {{ d.cksum }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
           </div>
         </template>
       </el-table-column>
@@ -276,16 +301,34 @@ const propsPool = ref(null), propsRootId = ref(0), ppBusy = ref(false)
 const pp = ref({ compression: 'inherit', dedup: 'off', cur_compression: '', cur_dedup: '' })
 
 const poolDs = ref({})
+const poolDisks = ref({})
 async function onExpand(row, expandedRows) {
   const open = Array.isArray(expandedRows) ? expandedRows.some(r => r.id === row.id) : !!expandedRows
-  if (!open || poolDs.value[row.id]) return
-  try {
-    const d = await api.get('/datasets?pool_id=' + row.id)
-    poolDs.value = { ...poolDs.value, [row.id]: (d.datasets || []).filter(x => x.name !== row.name) }
-  } catch (e) { poolDs.value = { ...poolDs.value, [row.id]: [] } }
+  if (!open) return
+  const jobs = []
+  if (!poolDs.value[row.id]) {
+    jobs.push(api.get('/datasets?pool_id=' + row.id).then(d => {
+      poolDs.value = { ...poolDs.value, [row.id]: (d.datasets || []).filter(x => x.name !== row.name) }
+    }).catch(() => { poolDs.value = { ...poolDs.value, [row.id]: [] } }))
+  }
+  if (!poolDisks.value[row.id]) {
+    jobs.push(api.get(`/pools/${row.id}/status`).then(d => {
+      const st = (d.status || {})[row.name] || Object.values(d.status || {})[0] || {}
+      const rows = st.vdev_rows || []
+      const disks = []
+      let group = ''
+      for (const r of rows) {
+        if (r.level === 0) group = r.name
+        if (r.type === 'disk' || r.type === 'file') disks.push({ ...r, group })
+      }
+      poolDisks.value = { ...poolDisks.value, [row.id]: disks }
+    }).catch(() => { poolDisks.value = { ...poolDisks.value, [row.id]: [] } }))
+  }
+  await Promise.all(jobs)
 }
 async function load() {
   poolDs.value = {}
+  poolDisks.value = {}
   busy.value = true
   try {
     const [p, n] = await Promise.all([api.get('/pools'), api.get('/nodes')])

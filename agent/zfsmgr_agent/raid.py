@@ -77,33 +77,45 @@ class RaidClient:
             cid = int(row.get("Ctl", row.get("Controller", 0)) or 0)
             detail = {}
             try:
-                detail = self._resp(self._json([f"/c{cid}", "show", "J"]))
+                # 温度/内存/BBU 等硬件信息只在 show all 的 HwCfg/Status 段中
+                detail = self._resp(self._json([f"/c{cid}", "show", "all", "J"]))
             except Exception:
-                pass
+                try:
+                    detail = self._resp(self._json([f"/c{cid}", "show", "J"]))
+                except Exception:
+                    detail = {}
+            basics = detail.get("Basics") or {}
+            status = detail.get("Status") or {}
+            hw = detail.get("HwCfg") or {}
+            ver = detail.get("Version") or {}
             out.append({
                 "id": cid,
-                "model": detail.get("Product Name") or row.get("Model", ""),
+                "model": basics.get("Model") or detail.get("Product Name") or row.get("Model", ""),
                 "ports": row.get("Ports"),
                 "pds": row.get("PDs"),
                 "dgs": row.get("DGs"),
                 "vds": row.get("VDs"),
-                "bbu": row.get("BBU") or detail.get("BBU", ""),
-                "health": row.get("Hlth") or detail.get("Controller Status", {}).get("Controller Status", ""),
-                "serial": detail.get("Serial Number", ""),
-                "sas_address": str(detail.get("SAS Address", "")).strip(),
-                "pci": detail.get("PCI Address", ""),
-                "fw": detail.get("FW Version", ""),
-                "fw_build": detail.get("FW Package Build", ""),
-                "bios": detail.get("BIOS Version", ""),
-                "driver": detail.get("Driver Name", ""),
-                "driver_ver": detail.get("Driver Version", ""),
-                "memory": detail.get("Memory", ""),
-                "bbu_detail": detail.get("BBU", ""),
-                "alarm": detail.get("Alarm", ""),
-                "temperature": detail.get("ROC Temperature", ""),
-                "raw": {k: detail.get(k) for k in
-                        ("Product Name", "Serial Number", "FW Version", "BBU", "Alarm",
-                         "ROC Temperature", "Controller Status", "HwCfg", "Supported Adapter")},
+                "bbu": hw.get("BBU") or row.get("BBU") or detail.get("BBU", ""),
+                "bbu_status": status.get("BBU Status", ""),
+                "health": status.get("Controller Status") or row.get("Hlth")
+                          or detail.get("Controller Status", {}).get("Controller Status", ""),
+                "serial": basics.get("Serial Number") or detail.get("Serial Number", ""),
+                "sas_address": str(basics.get("SAS Address") or detail.get("SAS Address", "")).strip(),
+                "pci": basics.get("PCI Address") or detail.get("PCI Address", ""),
+                "fw": ver.get("Firmware Version") or detail.get("FW Version", ""),
+                "fw_build": ver.get("Firmware Package Build") or detail.get("FW Package Build", ""),
+                "bios": ver.get("Bios Version") or detail.get("BIOS Version", ""),
+                "driver": ver.get("Driver Name") or detail.get("Driver Name", ""),
+                "driver_ver": ver.get("Driver Version") or detail.get("Driver Version", ""),
+                "memory": hw.get("On Board Memory Size") or detail.get("Memory", ""),
+                "memory_correctable": status.get("Memory Correctable Errors"),
+                "memory_uncorrectable": status.get("Memory Uncorrectable Errors"),
+                "cache_fw_mb": hw.get("Current Size of FW Cache (MB)"),
+                "bbu_detail": hw.get("BBU") or detail.get("BBU", ""),
+                "alarm": hw.get("Alarm") or detail.get("Alarm", ""),
+                "temperature": hw.get("ROC temperature(Degree Celsius)")
+                               or detail.get("ROC Temperature", ""),
+                "raw": {"Basics": basics, "Status": status, "HwCfg": hw, "Version": ver},
             })
         return out
 
@@ -151,14 +163,20 @@ class RaidClient:
             })
         return out
 
-    def events(self, ctrl: int, limit: int = 100) -> dict:
-        limit = max(1, min(int(limit or 100), 500))
+    def events(self, ctrl: int, page: int = 1, page_size: int = 50) -> dict:
+        page = max(1, int(page or 1))
+        page_size = max(10, min(int(page_size or 50), 200))
         text = self._run([f"/c{ctrl}", "show", "events"], timeout=45)
         # 截掉 storcli 尾部 "Controller = ... Status = ..." 汇总表
         text = re.split(r"\nController\s*=\s*\d+", text)[0]
         blocks = [b.strip() for b in re.split(r"\n(?=seqNum:)", text) if "seqNum:" in b]
+        total = len(blocks)
+        pages = max(1, (total + page_size - 1) // page_size)
+        if page > pages:
+            page = pages
+        start = (page - 1) * page_size
         entries = []
-        for b in blocks[-limit:]:
+        for b in blocks[start:start + page_size]:
             seq = re.search(r"seqNum:\s*(\S+)", b)
             t = re.search(r"^Time:\s*(.+)$", b, re.M)
             boot = re.search(r"Seconds since last reboot:\s*(\d+)", b)
@@ -169,7 +187,8 @@ class RaidClient:
                 "event": desc.group(1).strip() if desc else "",
                 "raw": b,
             })
-        return {"total": len(blocks), "returned": len(entries), "entries": entries}
+        return {"total": total, "page": page, "page_size": page_size,
+                "pages": pages, "returned": len(entries), "entries": entries}
 
     # ---------- 写操作(默认禁用) ----------
     def create_vd(self, ctrl: int, level: str, drives: list[str], name: str = "",

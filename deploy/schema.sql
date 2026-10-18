@@ -1,4 +1,4 @@
--- ZFS 存储管理平台 元数据库 schema v1 (PostgreSQL)
+-- storman 存储管理平台 元数据库 schema v1 (PostgreSQL)
 -- 说明:Manager 启动时自动执行(幂等);生产环境需授权 zfsmgr 角色。
 
 CREATE TABLE IF NOT EXISTS users (

@@ -49,6 +49,21 @@
           <el-descriptions-item label="sparse 卷">
             <el-tag size="small" type="success">zfs create -s(属性不可见)</el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="RAID 管理">
+            <el-tag size="small" :type="detail.capabilities.raid?.available ? 'success' : 'info'">
+              {{ detail.capabilities.raid?.available ? 'storcli 可用' : '未检测到 storcli' }}</el-tag>
+            <el-tag v-if="detail.capabilities.raid?.available" size="small" style="margin-left:4px"
+                    :type="detail.capabilities.raid?.allow_mutation ? 'success' : 'warning'">
+              {{ detail.capabilities.raid?.allow_mutation ? '可写' : '只读(写保护)' }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="节点写保护">
+            <el-tag size="small" :type="detail.capabilities.allow_mutation === false ? 'warning' : 'success'">
+              {{ detail.capabilities.allow_mutation === false ? '只读(全部变更已禁用)' : '可写' }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="LIO / rtslib">
+            <el-tag size="small" :type="detail.capabilities.lio_available === false ? 'info' : 'success'">
+              {{ detail.capabilities.lio_available === false ? '不可用(跳过 Target 同步)' : '可用' }}</el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="FC 目标模式" :span="2">
             <el-tag size="small" :type="detail.capabilities.fc?.fc_capable ? 'success' : 'info'">
               {{ detail.capabilities.fc?.fc_capable ? '可用' : '不可用' }}</el-tag>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ZFS 存储管理平台 e2e 冒烟(存储节点本机执行,root)
+# storman 存储管理平台 e2e 冒烟(存储节点本机执行,root)
 set -uo pipefail
 M=http://127.0.0.1:8080/api/v1
 # 凭据参数化:优先环境变量,其次部署期生成的 0600 文件;仓库内不含任何口令

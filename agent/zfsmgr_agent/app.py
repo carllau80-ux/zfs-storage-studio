@@ -1,4 +1,4 @@
-"""ZFS 存储管理平台 Node Agent —— FastAPI 服务与操作路由。
+"""storman 存储管理平台 Node Agent —— FastAPI 服务与操作路由(ZFS + RAID)。
 
 对外(仅 Manager 可访问,X-Agent-Token 校验):
   POST /api/v1/query {kind, params}
@@ -26,6 +26,7 @@ from .fmt import FmtError, FormatService, blkid_type, is_mounted
 from .lio import LioClient, LioError
 from . import shares as sharemgr
 from .metrics import MetricsSampler
+from .raid import RaidClient, RaidError
 from .zfs import ZfsError, ZfsJsonClient
 
 log = logging.getLogger("zfsmgr_agent")
@@ -39,7 +40,13 @@ class AgentRuntime:
         self.state = state
         self.lio = lio
         self.fmt = fmt
+        self.raid = RaidClient(cfg.raid_storcli_path, bool(cfg.raid_allow_mutation and cfg.allow_mutation))
         self.caps = sysinfo.capabilities()
+        self.caps["raid"] = self.raid.capabilities()
+        self.caps["allow_mutation"] = bool(cfg.allow_mutation)
+        # LIO 依赖 rtslib;缺失时跳过目标同步(节点仅做 ZFS/RAID 管理)
+        from .lio import RTSRoot
+        self.caps["lio_available"] = RTSRoot is not None
         self.metrics = MetricsSampler()
         self.lock = threading.RLock()
 
@@ -50,7 +57,7 @@ def make_app(cfg: Config) -> FastAPI:
     fmt = FormatService(lio.backstore_devs)
     rt = AgentRuntime(cfg=cfg, state=state, lio=lio, fmt=fmt)
 
-    app = FastAPI(title="zfsmgr-agent", docs_url=None, redoc_url=None)
+    app = FastAPI(title="storman-agent", docs_url=None, redoc_url=None)
     app.state.rt = rt
 
     async def check_token(x_agent_token: Optional[str] = Header(default=None)):
@@ -65,6 +72,8 @@ def make_app(cfg: Config) -> FastAPI:
         elif isinstance(e, LioError):
             code, msg = e.code, str(e)
         elif isinstance(e, FmtError):
+            code, msg = e.code, str(e)
+        elif isinstance(e, RaidError):
             code, msg = e.code, str(e)
         log.warning("agent error %s: %s", code, msg)
         return JSONResponse(status_code=200,
@@ -86,6 +95,7 @@ def make_app(cfg: Config) -> FastAPI:
         o = body.get("op", "")
         params = body.get("params") or {}
         try:
+            ensure_writable(rt.cfg)
             with rt.lock:
                 res = handle_op(rt, o, params)
             return {"ok": True, "result": res or {}}
@@ -97,6 +107,12 @@ def make_app(cfg: Config) -> FastAPI:
         return {"ok": True, "agent": sysinfo.AGENT_VERSION, "node_id": rt.state.node_id}
 
     return app
+
+
+def ensure_writable(cfg: Config) -> None:
+    """节点写保护:生产节点只允许查询,任何变更操作在 Agent 侧兜底拒绝。"""
+    if not cfg.allow_mutation:
+        raise ZfsError("当前节点为只读模式(生产环境),所有变更操作已禁用", code="READ_ONLY")
 
 
 # ---------------- 查询分发 ----------------
@@ -143,6 +159,16 @@ def handle_query(rt: AgentRuntime, kind: str, params: dict) -> dict:
         if typ == "nfs":
             return sharemgr.nfs_status(params.get("dataset", ""))
         return sharemgr.smb_status(params.get("name", ""))
+    # ---- RAID(只读) ----
+    if kind == "raid_controllers":
+        return {"controllers": rt.raid.controllers()}
+    if kind == "raid_vds":
+        return {"vds": rt.raid.vds(int(params.get("controller", 0)))}
+    if kind == "raid_pds":
+        return {"pds": rt.raid.pds(int(params.get("controller", 0)))}
+    if kind == "raid_events":
+        return rt.raid.events(int(params.get("controller", 0)),
+                              int(params.get("limit", 100)))
     raise ZfsError(f"未知查询: {kind}", code="VALIDATION")
 
 
@@ -299,6 +325,20 @@ def handle_op(rt: AgentRuntime, op: str, p: dict) -> dict:
     if op == "lio_config_save":
         rt.lio.save()
         return {"saved": True}
+    # ---- RAID(默认只读;开启 allow_mutation 后仍需确认串) ----
+    if op == "raid_vd_create":
+        return rt.raid.create_vd(int(p.get("controller", 0)), str(p.get("level", "")),
+                                 p.get("drives") or [], str(p.get("name", "")),
+                                 str(p.get("stripesize", "")), str(p.get("pdperarray", "")),
+                                 str(p.get("confirm", "")))
+    if op == "raid_vd_delete":
+        return rt.raid.delete_vd(int(p.get("controller", 0)), str(p.get("vd", "")),
+                                 str(p.get("confirm", "")))
+    if op == "raid_vd_set":
+        return rt.raid.set_vd(int(p.get("controller", 0)), str(p.get("vd", "")),
+                              p.get("name"), str(p.get("writepolicy", "")),
+                              str(p.get("readpolicy", "")), str(p.get("iopolicy", "")),
+                              str(p.get("access", "")), str(p.get("confirm", "")))
     raise ZfsError(f"未知操作: {op}", code="VALIDATION")
 
 
@@ -323,12 +363,14 @@ def register_loop(cfg: Config, rt: AgentRuntime):
         "capabilities": rt.caps,
     }
     base = cfg.manager_url.rstrip("/")
+    fresh = True  # 每次 Agent 启动都重新注册,刷新能力(配置可能变更)
     while True:
         try:
-            if rt.state.node_id is None:
+            if fresh or rt.state.node_id is None:
                 res = post_json(base + "/api/v1/agent/register", cfg.agent_token, body)
                 nid = res["data"]["node_id"]
                 rt.state.set("node_id", nid)
+                fresh = False
                 log.info("注册成功 node_id=%s", nid)
             nid = rt.state.node_id
             post_json(f"{base}/api/v1/agent/nodes/{nid}/heartbeat", cfg.agent_token,

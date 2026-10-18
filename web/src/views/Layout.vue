@@ -4,7 +4,7 @@
     <header class="md-topbar">
       <div class="md-brand" @click="$router.push('/dashboard')">
         <span class="md-logo"><i></i><i></i><i></i><i></i></span>
-        <span class="md-brand-name">RunStor 存储管理</span>
+        <span class="md-brand-name">storman 存储管理</span>
       </div>
       <div class="md-actions">
         <el-button text size="small" style="color:var(--my-text-2)" @click="toggleLang">
@@ -73,6 +73,7 @@ const I = {
   host: '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M4 9h16M4 15h16M9.5 6h.01M9.5 18h.01"/></svg>',
   map: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/><path d="M7 11v2a4 4 0 0 0 4 4h2"/></svg>',
   audit: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9.5 12h5M9.5 16h5"/></svg>',
+  raid: '<svg viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="5" rx="1.4"/><rect x="4" y="9.5" width="16" height="5" rx="1.4"/><rect x="4" y="15.5" width="16" height="5" rx="1.4"/><circle cx="7" cy="6" r="0.9" fill="var(--my-surface)"/><circle cx="7" cy="12" r="0.9" fill="var(--my-surface)"/><circle cx="7" cy="18" r="0.9" fill="var(--my-surface)"/></svg>',
   share: '<svg viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="10" cy="13" r="1.6"/><circle cx="16" cy="11.4" r="1.6"/><circle cx="15.4" cy="16.6" r="1.6"/><path d="M11.3 12.3l3.4-0.7M11.2 14.1l3 1.7M15.9 12.8l-0.4 2.2"/></svg>',
   user: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>'
 }
@@ -81,6 +82,7 @@ const navItems = computed(() => {
     { path: '/dashboard', label: '概览', icon: I.dash, color: '#4285f4' },    // 蓝:总览/入口
     { path: '/nodes', label: '节点', icon: I.node, color: '#7b1fa2' },        // 紫:服务器
     { path: '/pools', label: '存储池', icon: I.pool, color: '#0097a7' },      // 青:池/存储
+    { path: '/raid', label: 'RAID', icon: I.raid, color: '#8d6e63' },         // 棕:RAID 控制器/VD/PD
     { path: '/volumes', label: '卷', icon: I.vol, color: '#43a047' },         // 绿:数据卷
     { path: '/targets', label: 'Target', icon: I.iscsi, color: '#f4511e' },   // 橙红:目标(iSCSI/FC)
     { path: '/hosts', label: 'Initiator', icon: I.host, color: '#3949ab' },   // 靛蓝:客户端(iSCSI IQN/FC WWPN)

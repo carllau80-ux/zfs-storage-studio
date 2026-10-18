@@ -11,6 +11,28 @@ export function setLang(v) {
 
 // —— 词典:整句短语 + 高频词元(自动去重,按需补充) ——
 const D = {
+  // RAID
+  'RAID 管理(经节点 Agent / storcli)': 'RAID management (via node agent / storcli)',
+  'RAID 级别': 'RAID level', '创建 RAID 组': 'Create RAID group', '删除 RAID 组': 'Delete RAID group',
+  '虚拟磁盘 VD': 'Virtual drives (VD)', '物理磁盘 PD': 'Physical drives (PD)', 'RAID 日志': 'RAID log',
+  '只读节点': 'Read-only node', '可写节点': 'Writable node',
+  '只读模式:该节点被配置为禁止 RAID 写操作(生产/验证环境),创建/删除/改属性已禁用,仅可查看。':
+    'Read-only: RAID writes are disabled on this node (production/lab), create/delete/property changes are blocked.',
+  '只读节点,写操作已禁用': 'Read-only node; writes are disabled',
+  '只读节点:创建/删除/属性修改已禁用': 'Read-only node: create/delete/property changes disabled',
+  '控制器 ID': 'Controller ID', '序列号': 'Serial number', '固件': 'Firmware',
+  '条带大小': 'Stripe size', '每阵列磁盘数': 'Drives per array', '确认串': 'Confirmation phrase',
+  '写策略': 'Write policy', '读策略': 'Read policy', '访问策略': 'Access policy', 'IO 策略': 'I/O policy',
+  '物理磁盘': 'Physical drives', '介质': 'Media', '扇区': 'Sector', '热备': 'Spare', '型号': 'Model',
+  '日志总数': 'Total events', '序号': 'Seq', '事件': 'Event', '原始记录': 'Raw record',
+  '节点写保护': 'Node write protection', '只读(全部变更已禁用)': 'Read-only (all changes disabled)',
+  'RAID 管理': 'RAID', 'storcli 可用': 'storcli available', '未检测到 storcli': 'storcli not found',
+  '可写': 'Writable', '只读(写保护)': 'Read-only (write-protected)',
+  '不可用(跳过 Target 同步)': 'Unavailable (target sync skipped)',
+ '最近 50 条': 'Last 50', '最近 100 条': 'Last 100', '最近 200 条': 'Last 200',
+  '暂无日志': 'No events', '刷新日志': 'Refresh log', '创建(写操作)': 'Create (write)',
+  '已属于 DG 的磁盘会被控制器拒绝;创建会清空所选磁盘数据。':
+    'Disks already in a DG are rejected by the controller; creation wipes the selected disks.',
   // 登录 / 框架
   '存储管理': 'Storage Management',
   '存储节点': 'Storage nodes',
@@ -20,7 +42,7 @@ const D = {
   '活动会话': 'Active sessions',
   '主机 / 映射': 'Hosts / mappings',
   '登录以继续': 'Sign in to continue',
-  '存储管理员控制台 · 卷 / 快照 / iSCSI 映射': 'Storage admin console · Volumes / Snapshots / iSCSI mappings',
+  '存储管理员控制台 · 卷 / 快照 / RAID / iSCSI 映射': 'Storage admin console · Volumes / Snapshots / RAID / iSCSI mappings',
   '退出登录': 'Sign out',
   '切换到浅色': 'Switch to light',
   '切换到深色': 'Switch to dark',

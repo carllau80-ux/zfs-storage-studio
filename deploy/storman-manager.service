@@ -1,0 +1,14 @@
+[Unit]
+Description=storman Manager (Go)
+After=network.target postgresql.service
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/storman/bin/storman-manager -config /etc/storman/manager.toml
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

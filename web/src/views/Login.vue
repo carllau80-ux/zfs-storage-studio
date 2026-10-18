@@ -6,7 +6,7 @@
         <path d="M7.5 12.5l3.2 3.2 5.8-6" stroke="#fff" stroke-width="2" fill="none"
               stroke-linecap="round" stroke-linejoin="round" />
       </svg>
-      <h1>RunStor 存储管理</h1>
+      <h1>storman 存储管理</h1>
       <p class="login-sub">登录以继续</p>
       <a class="lang-link" @click="toggleLang">{{ langNow === 'en' ? '中文' : 'EN' }}</a>
       <el-form @keyup.enter="doLogin">
@@ -15,7 +15,7 @@
         <el-button type="primary" size="large" style="width:100%" :loading="busy" @click="doLogin">登录</el-button>
       </el-form>
     </div>
-    <p class="login-foot">存储管理员控制台 · 卷 / 快照 / iSCSI 映射</p>
+    <p class="login-foot">存储管理员控制台 · 卷 / 快照 / RAID / iSCSI 映射</p>
   </div>
 </template>
 <script setup>

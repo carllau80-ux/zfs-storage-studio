@@ -39,6 +39,11 @@ class Config:
     heartbeat_interval_s: int = 10
     state_file: str = "/var/lib/runstor/agent-state.json"
     agent_token_file: str = "/etc/zfs-platform/agent.token"
+    # 节点写保护:false 时所有变更类操作(池/卷/快照/共享/LIO/RAID)一律拒绝
+    allow_mutation: bool = True
+    # RAID(storcli);raid_allow_mutation=false 时仅允许只读查询
+    raid_storcli_path: str = "/opt/MegaRAID/storcli/storcli64"
+    raid_allow_mutation: bool = False
     # 解析后(不落盘打印)
     agent_token: str = field(default="", repr=False)
 

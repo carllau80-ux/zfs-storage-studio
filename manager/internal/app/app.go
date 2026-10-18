@@ -77,6 +77,15 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/pools/{id}", auth(a.requireRole("operator")(a.auditWrap("pool", a.handlePoolDelete))))
 	mux.HandleFunc("GET /api/v1/nodes/{id}/disks", auth(a.handleNodeDisks))
 
+	// --- RAID(经节点 Agent / storcli;写操作受只读能力门禁) ---
+	mux.HandleFunc("GET /api/v1/nodes/{id}/raid/controllers", auth(a.handleRaidControllers))
+	mux.HandleFunc("GET /api/v1/nodes/{id}/raid/controllers/{cid}/vds", auth(a.handleRaidVDs))
+	mux.HandleFunc("GET /api/v1/nodes/{id}/raid/controllers/{cid}/pds", auth(a.handleRaidPDs))
+	mux.HandleFunc("GET /api/v1/nodes/{id}/raid/controllers/{cid}/events", auth(a.handleRaidEvents))
+	mux.HandleFunc("POST /api/v1/nodes/{id}/raid/vds", auth(a.requireRole("operator")(a.auditWrap("raid", a.handleRaidVDCreate))))
+	mux.HandleFunc("PATCH /api/v1/nodes/{id}/raid/vds/{vd}", auth(a.requireRole("operator")(a.auditWrap("raid", a.handleRaidVDSet))))
+	mux.HandleFunc("DELETE /api/v1/nodes/{id}/raid/vds/{vd}", auth(a.requireRole("operator")(a.auditWrap("raid", a.handleRaidVDDelete))))
+
 	// --- 卷(dataset) ---
 	mux.HandleFunc("GET /api/v1/datasets", auth(a.handleDatasetsList))
 	mux.HandleFunc("POST /api/v1/datasets", auth(a.requireRole("operator")(a.auditWrap("dataset", a.handleDatasetCreate))))

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# ZFS 存储管理平台 · 一键安装/升级脚本(bundle 内执行,root)
+# storman 存储管理平台 · 一键安装/升级脚本(bundle 内执行,root)
 # 环境变量(带缺省):PREFIX MGR_PORT AGENT_PORT DB_NAME DB_USER DB_PASS DB_URL
 #                  INSTALL_AGENT NO_START UNIT_SUFFIX KEEP_OLD_CONFIG
 set -uo pipefail
 
-PREFIX=${PREFIX:-/opt/zfs-platform}
+PREFIX=${PREFIX:-/opt/storman}
 MGR_PORT=${MGR_PORT:-8080}
 AGENT_PORT=${AGENT_PORT:-9090}
 DB_NAME=${DB_NAME:-zfsmgr}
@@ -13,7 +13,7 @@ DB_PASS=${DB_PASS:-$(openssl rand -hex 12)}
 INSTALL_AGENT=${INSTALL_AGENT:-1}
 NO_START=${NO_START:-0}
 UNIT_SUFFIX=${UNIT_SUFFIX:-}
-ETC=${CFG_DIR:-/etc/zfs-platform}
+ETC=${CFG_DIR:-/etc/storman}
 SRC="$(cd "$(dirname "$0")/.." && pwd)"   # bundle 根
 log(){ echo "[install] $*"; }
 die(){ echo "[install] 错误: $*" >&2; exit 1; }
@@ -33,13 +33,13 @@ if command -v apt-get >/dev/null 2>&1; then
 fi
 
 # ---------- 2. 拷贝程序 ----------
-mkdir -p "$PREFIX/bin" "$ETC" /var/lib/runstor
+mkdir -p "$PREFIX/bin" "$ETC" /var/lib/storman
 log "部署到 $PREFIX ..."
-[ -f "$SRC/bin/zfs-manager" ] || die "缺少 $SRC/bin/zfs-manager(请先构建/解压完整 bundle)"
-cp -f "$SRC/bin/zfs-manager" "$PREFIX/bin/"
+[ -f "$SRC/bin/storman-manager" ] || die "缺少 $SRC/bin/storman-manager(请先构建/解压完整 bundle)"
+cp -f "$SRC/bin/storman-manager" "$PREFIX/bin/"
 rm -rf "$PREFIX/agent"; cp -r "$SRC/agent" "$PREFIX/agent"
 mkdir -p "$PREFIX/deploy"; cp -f "$SRC/deploy/schema.sql" "$PREFIX/deploy/" 2>/dev/null || true
-chmod -R a+rX "$PREFIX"; chmod +x "$PREFIX/bin/zfs-manager"
+chmod -R a+rX "$PREFIX"; chmod +x "$PREFIX/bin/storman-manager"
 
 # ---------- 3. 数据库(本机 PG;可用 DB_URL 跳过) ----------
 if [ -z "${DB_URL:-}" ]; then
@@ -96,7 +96,7 @@ manager_url = "http://127.0.0.1:${MGR_PORT}"
 node_name = "$(hostname -s | tr -c 'A-Za-z0-9_.-' '_' | head -c 40)"
 advertise_addr = "${ADV_IP}:${AGENT_PORT}"
 heartbeat_interval_s = 10
-state_file = "/var/lib/runstor/agent-state.json"
+state_file = "/var/lib/storman/agent-state.json"
 agent_token_file = "$ETC/agent.token"
 EOF
   chmod 600 "$ETC/agent.toml"
@@ -104,17 +104,17 @@ fi
 log "配置: $ETC/{manager,agent}.toml(敏感项引用 0600 文件)"
 
 # ---------- 5. systemd ----------
-MGR_UNIT=zfs-manager${UNIT_SUFFIX}.service
-AGENT_UNIT=zfs-agent${UNIT_SUFFIX}.service
+MGR_UNIT=storman-manager${UNIT_SUFFIX}.service
+AGENT_UNIT=storman-agent${UNIT_SUFFIX}.service
 cat > /etc/systemd/system/$MGR_UNIT <<EOF
 [Unit]
-Description=ZFS Storage Platform Manager (Go)
+Description=storman Manager (Go)
 After=network.target postgresql.service
 Wants=network.target
 
 [Service]
 Type=simple
-ExecStart=$PREFIX/bin/zfs-manager -config $ETC/manager.toml
+ExecStart=$PREFIX/bin/storman-manager -config $ETC/manager.toml
 Restart=always
 RestartSec=3
 LimitNOFILE=65536
@@ -125,7 +125,7 @@ EOF
 if [ "$INSTALL_AGENT" = 1 ]; then
   cat > /etc/systemd/system/$AGENT_UNIT <<EOF
 [Unit]
-Description=ZFS Storage Platform Node Agent (Python)
+Description=storman Node Agent (ZFS + RAID, Python)
 After=network.target
 Wants=network.target
 

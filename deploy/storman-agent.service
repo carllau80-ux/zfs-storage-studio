@@ -1,0 +1,15 @@
+[Unit]
+Description=storman Node Agent (ZFS + RAID)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m zfsmgr_agent.app -c /etc/storman/agent.toml
+WorkingDirectory=/opt/storman/agent
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

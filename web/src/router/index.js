@@ -10,6 +10,7 @@ const routes = [
       { path: 'dashboard', component: () => import('../views/Dashboard.vue'), meta: { title: '概览' } },
       { path: 'nodes', component: () => import('../views/Nodes.vue'), meta: { title: '节点' } },
       { path: 'pools', component: () => import('../views/Pools.vue'), meta: { title: '存储池' } },
+      { path: 'raid', component: () => import('../views/Raid.vue'), meta: { title: 'RAID' } },
       { path: 'volumes', component: () => import('../views/Volumes.vue'), meta: { title: '卷' } },
       { path: 'targets', component: () => import('../views/Targets.vue'), meta: { title: 'Target' } },
       { path: 'hosts', component: () => import('../views/Hosts.vue'), meta: { title: 'Initiator' } },

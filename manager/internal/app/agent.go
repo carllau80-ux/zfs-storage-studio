@@ -104,17 +104,32 @@ func (a *App) agentCall(ctx context.Context, node *NodeRow, path string, payload
 	if err != nil {
 		return nil, err
 	}
-	url := "http://" + node.AgentAddr + path
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
+	// 依次尝试 agent_addr 与 advertise_addr:本机 Agent 常为回环地址,
+	// 跨网 Agent 需用对外可达地址(advertise_addr)回连。
+	addrs := []string{node.AgentAddr}
+	if adv := node.AdvertiseAddr; adv != "" && adv != node.AgentAddr {
+		addrs = append(addrs, adv)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Agent-Token", a.cfg.AgentToken())
-	cl := &http.Client{Timeout: 90 * time.Second}
-	resp, err := cl.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("Agent(%s) 不可达: %v", node.Name, err)
+	cl := &http.Client{Timeout: 330 * time.Second}
+	var resp *http.Response
+	var lastErr error
+	for _, hp := range addrs {
+		if hp == "" {
+			continue
+		}
+		req, e := http.NewRequestWithContext(ctx, "POST", "http://"+hp+path, bytes.NewReader(body))
+		if e != nil {
+			return nil, e
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Agent-Token", a.cfg.AgentToken())
+		resp, lastErr = cl.Do(req)
+		if lastErr == nil {
+			break
+		}
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("Agent(%s) 不可达: %v", node.Name, lastErr)
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
@@ -204,15 +219,30 @@ func (a *App) syncNodeState(ctx context.Context, node *NodeRow) error {
 	if err := a.syncDatasets(ctx, node); err != nil {
 		return err
 	}
-	// 3. iSCSI targets/luns/acls
-	if err := a.syncIscsi(ctx, node); err != nil {
-		return err
-	}
-	// 3b. FC targets(节点具备兼容 HBA 时)
-	if err := a.syncFcTargets(ctx, node); err != nil {
-		return err
+	// 3. iSCSI targets/luns/acls(仅具备 LIO/rtslib 的节点)
+	if a.nodeLioAvailable(node) {
+		if err := a.syncIscsi(ctx, node); err != nil {
+			return err
+		}
+		// 3b. FC targets(节点具备兼容 HBA 时)
+		if err := a.syncFcTargets(ctx, node); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// nodeLioAvailable 读取节点能力中的 lio_available;老 Agent 未上报时按可用处理。
+func (a *App) nodeLioAvailable(node *NodeRow) bool {
+	caps := a.nodeCapMap(node)
+	if caps == nil {
+		return true
+	}
+	v, ok := caps["lio_available"].(bool)
+	if !ok {
+		return true
+	}
+	return v
 }
 
 func (a *App) syncDatasets(ctx context.Context, node *NodeRow) error {
